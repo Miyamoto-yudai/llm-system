@@ -16,7 +16,7 @@ import AuthCallback from './pages/AuthCallback'
 
 
 
-const config = new Configuration({ basePath: 'http://notebook.lawflow.jp:8000' }) // TODO: This is for dev
+const config = new Configuration({ basePath: 'http://localhost:8000' }) // Local development
 export const apiClient = new DefaultApi(config)
 
 
@@ -24,7 +24,7 @@ export const apiClient = new DefaultApi(config)
 function App() {
   return (
     <AuthProvider>
-      <div className='flex flex-col h-full w-full justify-center'>
+      <div className='flex flex-col min-h-screen w-full'>
         <Toaster
           position="top-right"
           toastOptions={{
@@ -46,14 +46,16 @@ function App() {
           }}
         />
         <Header />
-        <div className='flex flex-col h-full w-full'>
-          <Routes><Route path="/" element={<Chat />} /></Routes>
-          <Routes><Route path="/auth/callback" element={<AuthCallback />} /></Routes>
-          <Routes><Route path="/auth/error" element={<AuthCallback />} /></Routes>
-          <Routes><Route path="/company" element={<CompanyPage />} /></Routes>
-          <Routes><Route path="/terms" element={<TermsPage />} /></Routes>
-          <Routes><Route path="/privacy-policy" element={<PrivacyPolicyPage />} /></Routes>
-          <Routes><Route path="/asct" element={<AsctPage />} /></Routes>
+        <div className='flex flex-col flex-1 w-full'>
+          <Routes>
+            <Route path="/" element={<Chat />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/auth/error" element={<AuthCallback />} />
+            <Route path="/company" element={<CompanyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/asct" element={<AsctPage />} />
+          </Routes>
         </div>
         <Footer />
       </div>

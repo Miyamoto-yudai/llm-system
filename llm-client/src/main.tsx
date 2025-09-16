@@ -4,7 +4,6 @@ import ReactDOM from 'react-dom/client'
 import { Route, BrowserRouter } from "react-router-dom"
 
 import App from './App'
-import 'tailwindcss/tailwind.css'
 import './index.css'
 
 
