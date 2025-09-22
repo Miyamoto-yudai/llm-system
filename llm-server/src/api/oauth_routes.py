@@ -1,6 +1,8 @@
 import os
+import logging
 from typing import Optional
 from datetime import datetime
+from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, status, Request, Query
 from fastapi.responses import RedirectResponse
 from src.auth.oauth import get_google_auth_url, handle_google_callback
@@ -43,9 +45,10 @@ async def google_callback(
         return RedirectResponse(url=redirect_url)
 
     except Exception as e:
-        print(f"Google OAuth callback error: {e}")
+        logging.exception("Google OAuth callback error")
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-        error_url = f"{frontend_url}/auth/error?message=Authentication%20failed"
+        safe_message = quote(str(e) or "Authentication failed")
+        error_url = f"{frontend_url}/auth/error?message={safe_message}"
         return RedirectResponse(url=error_url)
 
 

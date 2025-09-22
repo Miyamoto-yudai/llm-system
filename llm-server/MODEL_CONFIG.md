@@ -14,10 +14,10 @@ src/config.py
 
 ```python
 GPT_MODELS = {
-    "main": "gpt-4",                    # メイン処理用（罪名予測など）
-    "classifier": "gpt-3.5-turbo-1106", # 相談タイプの分類用
-    "question_generator": "gpt-3.5-turbo", # 深掘り質問生成用
-    "streaming": "gpt-4",               # ストリーミング応答用
+    "main": "gpt-4o",                    # メイン処理用（罪名予測など）
+    "classifier": "gpt-4o-mini",          # 相談タイプの分類用
+    "question_generator": "gpt-4o-mini",  # 深掘り質問生成用
+    "streaming": "gpt-4o-mini",           # ストリーミング応答用
     "embedding": "text-embedding-ada-002" # RAG用のembedding
 }
 ```
@@ -72,8 +72,9 @@ TEMPERATURE_SETTINGS = {
 ## 利用可能なモデル（2024年時点）
 
 ### GPTモデル
-- `gpt-4` - 最も高精度
-- `gpt-4-turbo-preview` - 高速版のGPT-4
+- `gpt-4o` - マルチモーダル対応で高精度
+- `gpt-4o-mini` - コストと速度重視の軽量版
+- `gpt-4` - 従来の高精度モデル
 - `gpt-3.5-turbo` - 高速・低コスト
 - `gpt-3.5-turbo-1106` - 改良版のGPT-3.5
 

@@ -1,7 +1,6 @@
-import openai
-from openai import OpenAI
 import numpy as np
 from typing import List, Union
+
 import src.config as config
 
 def ada(text: str) -> List[float]:
@@ -9,7 +8,7 @@ def ada(text: str) -> List[float]:
     OpenAI APIを使用してテキストをembeddingに変換
     設定ファイルで指定されたembeddingモデルを使用
     """
-    client = OpenAI()
+    client = config.get_openai_client()
     response = client.embeddings.create(
         model=config.get_model("embedding"),
         input=text
@@ -20,7 +19,7 @@ def ada_batch(texts: List[str]) -> List[List[float]]:
     """
     複数のテキストを一度にembeddingに変換
     """
-    client = OpenAI()
+    client = config.get_openai_client()
     response = client.embeddings.create(
         model=config.get_model("embedding"),
         input=texts

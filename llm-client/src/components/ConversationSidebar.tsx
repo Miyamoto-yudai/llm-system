@@ -94,7 +94,7 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
 
   const sidebarContent = (
     <>
-      <div className="p-4 border-b border-gray-700">
+      <div className="p-4 border-b border-gray-200 bg-white">
         <button
           onClick={() => {
             onNewConversation()
@@ -107,12 +107,12 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-white">
         {isLoading ? (
-          <div className="p-4 text-gray-400 text-center">読み込み中...</div>
+          <div className="p-4 text-gray-500 text-center">読み込み中...</div>
         ) : conversations.length === 0 ? (
-          <div className="p-4 text-gray-400 text-center">
-            <FaComments className="mx-auto mb-2 text-3xl" />
+          <div className="p-4 text-gray-500 text-center">
+            <FaComments className="mx-auto mb-2 text-3xl text-gray-400" />
             <p>会話履歴がありません</p>
           </div>
         ) : (
@@ -121,8 +121,8 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
               <div
                 key={conversation.id}
                 className={clsx(
-                  'group rounded-md hover:bg-gray-700 transition-colors',
-                  selectedConversationId === conversation.id && 'bg-gray-700'
+                  'group rounded-md transition-colors border border-transparent hover:bg-gray-100',
+                  selectedConversationId === conversation.id && 'bg-indigo-50 border-indigo-200'
                 )}
               >
                 {editingId === conversation.id ? (
@@ -136,7 +136,7 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                         if (e.key === 'Enter') handleEditTitle(conversation.id)
                         if (e.key === 'Escape') setEditingId(null)
                       }}
-                      className="flex-1 px-2 py-1 bg-gray-600 text-white rounded text-sm"
+                      className="flex-1 px-2 py-1 bg-white border border-gray-300 text-gray-800 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       autoFocus
                     />
                   </div>
@@ -149,8 +149,8 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                     }}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm truncate">{conversation.title}</p>
-                      <p className="text-gray-400 text-xs">
+                      <p className="text-gray-800 text-sm truncate">{conversation.title}</p>
+                      <p className="text-gray-500 text-xs">
                         {formatDate(conversation.updated_at)}
                       </p>
                     </div>
@@ -160,7 +160,7 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                           e.stopPropagation()
                           startEditing(conversation.id, conversation.title)
                         }}
-                        className="p-1 text-gray-400 hover:text-white"
+                        className="p-1 text-gray-400 hover:text-gray-600"
                       >
                         <FaEdit size={14} />
                       </button>
@@ -169,7 +169,7 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                           e.stopPropagation()
                           handleDeleteConversation(conversation.id)
                         }}
-                        className="p-1 text-gray-400 hover:text-red-400"
+                        className="p-1 text-gray-400 hover:text-red-500"
                       >
                         <FaTrash size={14} />
                       </button>
@@ -189,7 +189,7 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
       {/* Mobile menu button */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="md:hidden fixed top-20 left-4 z-40 p-2 bg-gray-800 text-white rounded-md"
+        className="md:hidden fixed top-20 left-4 z-40 p-2 bg-white text-gray-700 border border-gray-200 rounded-md shadow-sm"
       >
         <FaBars size={20} />
       </button>
@@ -205,7 +205,7 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
       {/* Sidebar */}
       <div
         className={clsx(
-          'fixed md:relative w-72 h-full bg-gray-800 flex flex-col z-50 transition-transform duration-300',
+          'fixed md:relative w-72 h-full bg-white flex flex-col z-50 transition-transform duration-300 border-r border-gray-200',
           'md:translate-x-0',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         )}

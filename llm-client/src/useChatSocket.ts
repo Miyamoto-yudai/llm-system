@@ -3,14 +3,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Message } from './components/Dialog'
 
 export const useChatSocket = () => {
-  const t = "こんにちは、法律相談LawFlowです。刑事事件の法律相談に無料で回答します。以下の注意事項をお読みいただいた上で、ご相談ください。\n＊注意事項＊\n○本サービスによる回答がユーザー様のご希望に沿ったり有益であることやいかなる誤りもないことは保証できません。\n○本サービスの利用に起因してユーザー様に生じたあらゆる損害について一切の責任を負いません。\n○投稿した発言は削除できません\n○正確に回答できない可能性がありますので、弁護士に相談するなどして、回答の正確性を確保するようにしてください。"
+  const introText = "こんにちは、法律相談LawFlowです。刑事事件の法律相談に無料で回答します。以下の注意事項をお読みいただいた上で、ご相談ください。\n＊注意事項＊\n○本サービスによる回答がユーザー様のご希望に沿ったり有益であることやいかなる誤りもないことは保証できません。\n○本サービスの利用に起因してユーザー様に生じたあらゆる損害について一切の責任を負いません。\n○投稿した発言は削除できません\n○正確に回答できない可能性がありますので、弁護士に相談するなどして、回答の正確性を確保するようにしてください。"
+  const welcomeText = "こんにちは。ご相談やご質問があればお気軽にお知らせください。"
   const [inputText, setInputText] = useState<string>('')
   const [chunk, setChunk] = useState<string[]>([])
   var chk = ""
   const [messages, setMessages] = useState<Message[]>([
-    { speakerId: 0, text: t},
+    { speakerId: 0, text: introText },
+    { speakerId: 0, text: welcomeText }
   ])
-
+  
   const addMessage = useCallback(
     (speakerId: number, text: string) => {
       setMessages((ms) => [...ms, { speakerId: speakerId, text: text }])
@@ -30,10 +32,11 @@ export const useChatSocket = () => {
   )
 
   const socketRef = useRef<WebSocket>()
+  const hasWelcomeRef = useRef<boolean>(true)
   useEffect(() => {
     //const websocket = new WebSocket('wss://llm-server.lawflow.jp/chat') // 本番用
     //const websocket = new WebSocket('ws://notebook.lawflow.jp:8080/chat') // 開発用
-    const websocket = new WebSocket('ws://127.0.0.1:8080/chat')//ローカルサーバのテスト用
+    const websocket = new WebSocket('ws://localhost:8080/chat')//ローカルサーバのテスト用
     socketRef.current = websocket
 
     const onMessage = (event: MessageEvent<string>) => {
@@ -42,7 +45,16 @@ export const useChatSocket = () => {
       if(text=="<start>"){
 	//none
       }else if(text=="<end>"){
-	addMessage(0, chk)
+	const message = chk
+	if(message === welcomeText && hasWelcomeRef.current){
+	  setChunk([])
+	  chk=""
+	  return
+	}
+	addMessage(0, message)
+	if(message === welcomeText){
+	  hasWelcomeRef.current = true
+	}
 	setChunk([])
 	chk=""
       }else{

@@ -8,6 +8,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from src.database.connection import get_database
 from src.database.models import UserModel, SessionModel
+from bson import ObjectId
 
 load_dotenv()
 
@@ -97,7 +98,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise credentials_exception
 
     # Get user from database
-    user = await db.users.find_one({"_id": session["user_id"]})
+    session_user_id = session.get("user_id")
+
+    query = {"_id": session_user_id}
+    if isinstance(session_user_id, str) and ObjectId.is_valid(session_user_id):
+        query = {"_id": ObjectId(session_user_id)}
+
+    user = await db.users.find_one(query)
     if user is None:
         raise credentials_exception
 

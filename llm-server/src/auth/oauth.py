@@ -1,9 +1,11 @@
 import os
+import re
+import secrets
 import httpx
 from typing import Optional, Dict
 from authlib.integrations.starlette_client import OAuth
 from dotenv import load_dotenv
-from src.database.connection import get_database
+from src.database.connection import get_database, connect_to_mongo
 from src.database.models import UserModel
 from src.auth.authentication import create_session
 from datetime import datetime
@@ -42,6 +44,14 @@ async def get_or_create_oauth_user(provider: str, provider_user_id: str, email: 
     """Get existing user or create new one from OAuth provider data"""
     db = get_database()
 
+    if db is None:
+        # Fallback for cases where the Mongo connection hasn't been initialised yet
+        await connect_to_mongo()
+        db = get_database()
+
+    if db is None:
+        raise RuntimeError("MongoDB connection is not initialized")
+
     # First check if user exists with this provider ID
     user = await db.users.find_one({
         "oauth_providers.provider": provider,
@@ -78,8 +88,22 @@ async def get_or_create_oauth_user(provider: str, provider_user_id: str, email: 
         return await db.users.find_one({"_id": user["_id"]})
 
     # Create new user
+    def _generate_username(display_name: str, email_address: str) -> str:
+        # Prefer display name, keep unicode, replace whitespace with underscore
+        base = re.sub(r"\s+", "_", display_name.strip())
+        if len(base) < 3:
+            # Fall back to email local-part
+            local_part = email_address.split("@")[0]
+            base = re.sub(r"\s+", "_", local_part)
+        if len(base) < 3:
+            base = f"user_{secrets.token_hex(3)}"
+        # Trim to reasonable length
+        return base[:50]
+
+    generated_username = _generate_username(name or "user", email)
+
     user_model = UserModel(
-        username=name.replace(" ", "_").lower(),
+        username=generated_username,
         email=email,
         password_hash="OAUTH_USER",  # OAuth users don't have passwords
         oauth_providers=[{

@@ -16,7 +16,8 @@ import AuthCallback from './pages/AuthCallback'
 
 
 
-const config = new Configuration({ basePath: 'http://localhost:8000' }) // Local development
+const apiBasePath = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const config = new Configuration({ basePath: apiBasePath })
 export const apiClient = new DefaultApi(config)
 
 

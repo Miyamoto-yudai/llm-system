@@ -18,10 +18,13 @@ export const oauthService = {
     storage.setUser(data.user)
   },
 
-  initiateGoogleLogin(): void {
-    // This will redirect the user to Google's OAuth page
-    oauthService.getGoogleAuthUrl().then(url => {
+  async initiateGoogleLogin(): Promise<void> {
+    try {
+      const url = await oauthService.getGoogleAuthUrl()
       window.location.href = url
-    })
+    } catch (error) {
+      console.error('Failed to initiate Google login', error)
+      throw error
+    }
   }
 }

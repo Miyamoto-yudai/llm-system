@@ -3,12 +3,13 @@
 import os, sys
 import csv
 import re
-import openai
+import logging
 from pathlib import Path
-from openai import OpenAI
 from importlib import reload
+
 import numpy as np
 from tqdm import tqdm_notebook as tqdm
+
 import src.gen.chat as chat
 import src.config as config
 
@@ -48,6 +49,7 @@ macro_inst = """
 つまり、深掘り質問を行うことで参照シート名の行を１つまでに特定することができます。
 深掘り質問を行う場合には、必ず２列目移行のヒアリング項目の表現を使用してください。
 深掘り質問が必要ない場合は相談者への回答ではなく「MOVE{参照シート名}」の形式で出力してください。
+必要な情報が揃っていない場合でも、現時点で最も可能性の高い候補や追加で確認すべき項目を文章で簡潔にまとめて出力してください。MOVEが特定できない場合は、その理由と不足している情報を箇条書きで示してください。
 また回答や質問は相談者に提示する範囲のみとし、途中の思考経路は表示しないようにしてください。
 
 # 大分類シート
@@ -55,7 +57,7 @@ macro_inst = """
 
 
 def gen(inst, hist):
-    client = OpenAI()
+    client = config.get_openai_client()
     resp = client.chat.completions.create(
         model=config.get_model("main"),
         temperature=config.get_temperature("main"),
@@ -78,6 +80,7 @@ def make_inst(sheet_name, csv):
 相談者の発言から特定が十分にできていない場合は、相談者に深掘り質問を提示してください。
 深掘り質問を行う場合には、必ず２列目移行の判断基準の表現を1つ以上使用してください。
 罪名の候補が3個以下になったら、関連する罪名をすべて列挙して教えてください。
+必要な情報が不足している場合でも、現時点で判明している事実と不足している判断要素を整理し、追加確認事項を明示してください。
 事件概要から罪名が該当した理由は含めないでください。
 また回答や質問は相談者に提示する範囲のみとし、途中の思考経路は表示しないようにしてください。
 
@@ -92,8 +95,11 @@ def answer(hist):
         print("does not move")
         return dicision
     else:
-        move_to = dicision.split("MOVE{")[1].split("}")[0]
-        target_csv = crime_map[move_to]
+        move_to = dicision.split("MOVE{")[1].split("}")[0].strip()
+        target_csv = crime_map.get(move_to)
+        if target_csv is None:
+            logging.warning("Unknown MOVE target received: %s", move_to)
+            return dicision
         inst = make_inst(move_to, target_csv)
         result = gen(inst, hist)
         return result

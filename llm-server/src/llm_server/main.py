@@ -1,6 +1,7 @@
 import os, sys
 import logging
 import json
+import asyncio
 from typing import Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,6 +74,10 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):
     user_id = None
     conversation_id = None
 
+    # メッセージ処理用のロックを作成
+    processing_lock = asyncio.Lock()
+    is_processing = False
+
     if token:
         payload = decode_token(token)
         if payload:
@@ -91,67 +96,88 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):
     while True:
         try:
             json_string = await ws.receive_text()
-            hist = json.loads(json_string)
-            print("HIST ", hist)
-            acc = []
-            for h in hist:
-                if h["speakerId"] == 1:
-                    acc.append({"role": "user", "content": h['text']})
+
+            # 処理中の場合は新しいメッセージを無視
+            async with processing_lock:
+                if is_processing:
+                    await ws.send_json({'text': '現在処理中です。少々お待ちください。', 'type': 'warning'})
+                    continue
+                is_processing = True
+
+            try:
+                hist = json.loads(json_string)
+                print("HIST ", hist)
+                acc = []
+                for h in hist:
+                    if h["speakerId"] == 1:
+                        acc.append({"role": "user", "content": h['text']})
+                    else:
+                        acc.append({"role": "assistant", "content": h['text']})
+                        print("acc:", acc)
+
+                # Save user message if authenticated
+                if conversation_id and acc and acc[-1]["role"] == "user":
+                    db = get_database()
+                    user_msg = MessageModel(
+                        conversation_id=conversation_id,
+                        role="user",
+                        content=acc[-1]["content"]
+                    )
+                    await db.messages.insert_one(user_msg.dict(by_alias=True))
+
+                rep = c.reply(acc)
+                response_text = ""
+
+                await ws.send_json({'text': '<start>'})
+
+                # repがジェネレータの場合とそうでない場合を区別
+                if isinstance(rep, str):
+                    response_text += rep
+                    await ws.send_json({'text': rep})
                 else:
-                    acc.append({"role": "assistant", "content": h['text']})
-                    print("acc:", acc)
+                    for x in rep:
+                        response_text += x
+                        await ws.send_json({'text': x})
 
-            # Save user message if authenticated
-            if conversation_id and acc and acc[-1]["role"] == "user":
-                db = get_database()
-                user_msg = MessageModel(
-                    conversation_id=conversation_id,
-                    role="user",
-                    content=acc[-1]["content"]
-                )
-                await db.messages.insert_one(user_msg.dict(by_alias=True))
+                await ws.send_json({'text': '<end>'})
 
-            rep = c.reply(acc)
-            response_text = ""
+                # Save assistant message if authenticated
+                if conversation_id:
+                    db = get_database()
+                    assistant_msg = MessageModel(
+                        conversation_id=conversation_id,
+                        role="assistant",
+                        content=response_text
+                    )
+                    await db.messages.insert_one(assistant_msg.dict(by_alias=True))
 
-            await ws.send_json({'text': '<start>'})
+                    # Update conversation's updated_at
+                    await db.conversations.update_one(
+                        {"_id": conv_model.id},
+                        {"$set": {"updated_at": datetime.utcnow()}}
+                    )
 
-            # repがジェネレータの場合とそうでない場合を区別
-            if isinstance(rep, str):
-                response_text += rep
-                await ws.send_json({'text': rep})
-            else:
-                for x in rep:
-                    response_text += x
-                    await ws.send_json({'text': x})
+                acc.append({"role": "assistant", "content": response_text})
+                log_chat(acc[-2:])
 
-            await ws.send_json({'text': '<end>'})
-
-            # Save assistant message if authenticated
-            if conversation_id:
-                db = get_database()
-                assistant_msg = MessageModel(
-                    conversation_id=conversation_id,
-                    role="assistant",
-                    content=response_text
-                )
-                await db.messages.insert_one(assistant_msg.dict(by_alias=True))
-
-                # Update conversation's updated_at
-                await db.conversations.update_one(
-                    {"_id": conv_model.id},
-                    {"$set": {"updated_at": datetime.utcnow()}}
-                )
-
-            acc.append({"role": "assistant", "content": response_text})
-            log_chat(acc[-2:])
+            finally:
+                # 処理完了フラグをリセット
+                async with processing_lock:
+                    is_processing = False
 
         except WebSocketDisconnect:
             break
         except Exception as e:
-            print(e)
-            logging.error(e)
-            resp = LLMResponse(text="Error has occurred.")
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error details: {error_details}")
+            logging.error(f"Error details: {error_details}")
+
+            # エラーが発生した場合もフラグをリセット
+            async with processing_lock:
+                is_processing = False
+
+            resp = LLMResponse(text="申し訳ございません。エラーが発生しました。もう一度お試しください。")
             await ws.send_json(resp.dict())
 
 @app.websocket("/ws/chat")

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { oauthService } from '../services/oauth.service'
 import GoogleButton from './GoogleButton'
 import clsx from 'clsx'
+import toast from 'react-hot-toast'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -87,9 +88,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true)
     try {
-      oauthService.initiateGoogleLogin()
+      await oauthService.initiateGoogleLogin()
     } catch (error) {
       console.error('Google login error:', error)
+      toast.error('Googleログインを開始できませんでした')
+    } finally {
+      // リダイレクトが発生しない場合のみローディングを解除
       setIsGoogleLoading(false)
     }
   }
