@@ -1,9 +1,15 @@
 import React from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { FaFlask } from 'react-icons/fa'
 import { useAuth } from '../contexts/AuthContext'
 import UserMenu from './UserMenu'
 
 const Header: React.FC = () => {
   const { isAuthenticated } = useAuth()
+  const location = useLocation()
+  const isComparisonModeEnabled = import.meta.env.VITE_COMPARISON_MODE_ENABLED === 'true'
+  const isOnComparisonPage = location.pathname === '/comparison'
+
   return (
     <header className='bg-white border-b border-gray-200 w-full'>
       <div className='container mx-auto px-4'>
@@ -20,7 +26,19 @@ const Header: React.FC = () => {
             </div>
           </a>
 
-          <div className='flex items-center gap-8'>
+          <div className='flex items-center gap-4'>
+            {/* Comparison mode toggle button (development only) */}
+            {isComparisonModeEnabled && !isOnComparisonPage && (
+              <Link
+                to="/comparison"
+                className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                title="深掘り質問の比較検証モード"
+              >
+                <FaFlask className="w-3 h-3" />
+                <span>比較モード</span>
+              </Link>
+            )}
+
             <a href="https://tokyo-keijibengosi.com/"
                target="_blank"
                rel="noopener noreferrer"

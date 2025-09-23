@@ -8,6 +8,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import Chat from './components/Chat'
+import ComparisonMode from './components/ComparisonMode'
 import CompanyPage from './pages/Company'
 import TermsPage from './pages/Terms'
 import PrivacyPolicyPage from './pages/PrivacyPolicy'
@@ -23,6 +24,8 @@ export const apiClient = new DefaultApi(config)
 
 
 function App() {
+  const isComparisonModeEnabled = import.meta.env.VITE_COMPARISON_MODE_ENABLED === 'true'
+
   return (
     <AuthProvider>
       <div className='flex flex-col min-h-screen w-full'>
@@ -50,6 +53,9 @@ function App() {
         <div className='flex flex-col flex-1 w-full'>
           <Routes>
             <Route path="/" element={<Chat />} />
+            {isComparisonModeEnabled && (
+              <Route path="/comparison" element={<ComparisonMode />} />
+            )}
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/auth/error" element={<AuthCallback />} />
             <Route path="/company" element={<CompanyPage />} />

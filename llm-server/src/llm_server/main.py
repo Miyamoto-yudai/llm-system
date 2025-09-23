@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 import src.gen.lawflow.lc as lc
 import src.gen.util as u
 import src.chat as c
+import src.config as config
 from src.database.connection import (
     connect_to_mongo, close_mongo_connection, init_indexes, get_database
 )
@@ -65,6 +66,12 @@ def healthcheck():
 app.include_router(session_routes.router)
 app.include_router(oauth_routes.router)
 app.include_router(conversation_routes.router)
+
+# 比較モードが有効な場合のみ比較用ルートを追加
+if config.COMPARISON_MODE_ENABLED:
+    from src.api import comparison_routes
+    app.include_router(comparison_routes.router)
+    print("Comparison mode routes enabled")
 
 @app.websocket("/chat")
 async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):

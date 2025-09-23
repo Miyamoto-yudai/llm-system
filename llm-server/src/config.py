@@ -49,6 +49,9 @@ SETTINGS = {
     "response_format_json": {"type": "json_object"}  # JSON出力形式
 }
 
+# 比較モードの設定（開発環境でのみ有効）
+COMPARISON_MODE_ENABLED = os.getenv("ENABLE_COMPARISON_MODE", "false").lower() == "true"
+
 
 @lru_cache
 def get_openai_client() -> OpenAI:
