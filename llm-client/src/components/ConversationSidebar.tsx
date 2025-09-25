@@ -29,6 +29,18 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
     }
   }, [isAuthenticated])
 
+  // Refresh conversations when a new one is created
+  useEffect(() => {
+    const handleConversationCreated = () => {
+      loadConversations()
+    }
+
+    window.addEventListener('conversationCreated', handleConversationCreated)
+    return () => {
+      window.removeEventListener('conversationCreated', handleConversationCreated)
+    }
+  }, [])
+
   const loadConversations = async () => {
     setIsLoading(true)
     try {

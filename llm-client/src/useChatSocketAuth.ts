@@ -14,7 +14,7 @@ export const useChatSocketAuth = (conversationId: string | null) => {
     { speakerId: 0, text: welcomeText }
   ])
   const [isConnected, setIsConnected] = useState(false)
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(conversationId)
 
   const socketRef = useRef<WebSocket>()
   const chunkAccumulator = useRef<string>('')
@@ -53,6 +53,12 @@ export const useChatSocketAuth = (conversationId: string | null) => {
       // Handle different message types
       if (data.type === 'conversation_id') {
         setCurrentConversationId(data.conversation_id)
+        // Notify parent component about the new conversation ID
+        if (window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('conversationCreated', {
+            detail: { conversationId: data.conversation_id }
+          }))
+        }
       } else if (data.type === 'history') {
         // Load conversation history
         const historyMessages: Message[] = [

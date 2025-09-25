@@ -62,6 +62,7 @@ const Chat: React.FC = () => {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isCreatingNewConversation, setIsCreatingNewConversation] = useState(false)
+  const [isPendingNewConversation, setIsPendingNewConversation] = useState(false)
 
   // Use different hooks based on authentication status
   const guestChat = useChatSocket()
@@ -79,6 +80,21 @@ const Chat: React.FC = () => {
   const lastMessageRef = useRef<string>('')
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Listen for new conversation creation from WebSocket
+  useEffect(() => {
+    const handleConversationCreated = (e: CustomEvent) => {
+      if (isPendingNewConversation && e.detail?.conversationId) {
+        setSelectedConversationId(e.detail.conversationId)
+        setIsPendingNewConversation(false)
+      }
+    }
+
+    window.addEventListener('conversationCreated', handleConversationCreated as any)
+    return () => {
+      window.removeEventListener('conversationCreated', handleConversationCreated as any)
+    }
+  }, [isPendingNewConversation])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -218,21 +234,13 @@ const Chat: React.FC = () => {
   const handleNewConversation = async () => {
     if (!isAuthenticated) return
 
-    setIsCreatingNewConversation(true)
-    try {
-      const newConv = await conversationService.createConversation({
-        title: '新しい会話'
-      })
-      setSelectedConversationId(newConv.id)
-      if ('resetChat' in chat) {
-        (chat as any).resetChat()
-      }
-      toast.success('新しい会話を開始しました')
-    } catch (error) {
-      toast.error('会話の作成に失敗しました')
-    } finally {
-      setIsCreatingNewConversation(false)
+    // Reset to null to indicate new conversation (won't be saved until first message)
+    setSelectedConversationId(null)
+    setIsPendingNewConversation(true)
+    if ('resetChat' in chat) {
+      (chat as any).resetChat()
     }
+    toast.success('新しい会話を開始しました')
   }
 
   return (
