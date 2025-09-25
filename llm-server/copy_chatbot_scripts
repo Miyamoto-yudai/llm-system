@@ -1,0 +1,11 @@
+#!/bin/bash
+
+cp -r ~/workspace/sai-shiki-brain/src/gen ./src/
+
+## dataset
+cp ~/workspace/sai-shiki-brain/dataset/lawflow/processed/criminal264.pickle ./dataset/
+cp ~/workspace/sai-shiki-brain/dataset/lawflow/processed/criminalprocedure.pickle ./dataset/
+# 罪名予測スプシなど
+cp -r ~/workspace/sai-shiki-brain/dataset/lawflow/raw ./dataset/
+# 被疑者ガイド
+cp -r ~/workspace/sai-shiki-brain/dataset/lawflow/processed/ref/guidance ./dataset/
