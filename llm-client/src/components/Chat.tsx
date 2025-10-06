@@ -7,6 +7,7 @@ import ConversationSidebar from './ConversationSidebar'
 import LoginModal from './LoginModal'
 import LoadingSpinner from './LoadingSpinner'
 import QuickTemplates from './QuickTemplates'
+import TopicSelector from './TopicSelector'
 import TypingIndicator from './TypingIndicator'
 import { useChatSocket } from '../useChatSocket'
 import { useChatSocketAuth } from '../useChatSocketAuth'
@@ -63,10 +64,11 @@ const Chat: React.FC = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isCreatingNewConversation, setIsCreatingNewConversation] = useState(false)
   const [isPendingNewConversation, setIsPendingNewConversation] = useState(false)
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null)
 
   // Use different hooks based on authentication status
-  const guestChat = useChatSocket()
-  const authChat = useChatSocketAuth(selectedConversationId)
+  const guestChat = useChatSocket(selectedGenre)
+  const authChat = useChatSocketAuth(selectedConversationId, selectedGenre)
 
   const chat = isAuthenticated ? authChat : guestChat
   const { inputText, setInputText, messages, onSubmit, chunk } = chat
@@ -96,31 +98,8 @@ const Chat: React.FC = () => {
     }
   }, [isPendingNewConversation])
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+N: New conversation
-      if (e.ctrlKey && e.key === 'n') {
-        e.preventDefault()
-        if (isAuthenticated) {
-          handleNewConversation()
-        }
-      }
-      // Ctrl+Shift+C: Clear chat
-      if (e.ctrlKey && e.shiftKey && e.key === 'C') {
-        e.preventDefault()
-        handleClearChat()
-      }
-      // Focus on input with '/'
-      if (e.key === '/' && document.activeElement !== textareaRef.current) {
-        e.preventDefault()
-        textareaRef.current?.focus()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isAuthenticated])
+  // Removed keyboard shortcuts (Ctrl+N, Ctrl+Shift+C, /) as they were not user-friendly
+  // History navigation (↑/↓) is kept in handleHistoryNavigation
 
   // Remove auto-scroll functionality - users can manually scroll as needed
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -321,7 +300,16 @@ const Chat: React.FC = () => {
 
               {/* Quick actions bar */}
               <div className='flex flex-wrap gap-2 items-center'>
-                <QuickTemplates onSelectTemplate={handleTemplateSelect} />
+                {/* Topic Selector */}
+                <TopicSelector
+                  selectedGenre={selectedGenre}
+                  onSelectGenre={setSelectedGenre}
+                />
+
+                <QuickTemplates
+                  onSelectTemplate={handleTemplateSelect}
+                  textareaRef={textareaRef}
+                />
 
                 <div className='flex gap-2 ml-auto'>
                   {messages.length > 0 && (
@@ -337,7 +325,7 @@ const Chat: React.FC = () => {
                       <button
                         onClick={handleClearChat}
                         className='flex items-center gap-2 px-3 py-2 text-sm bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors text-gray-600 hover:text-red-600'
-                        title='会話をクリア (Ctrl+Shift+C)'
+                        title='会話をクリア'
                       >
                         <FaTrash className='w-3 h-3' />
                         <span className='hidden sm:inline'>クリア</span>
@@ -348,7 +336,7 @@ const Chat: React.FC = () => {
                     <button
                       onClick={handleNewConversation}
                       className='flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors'
-                      title='新しい会話 (Ctrl+N)'
+                      title='新しい会話'
                     >
                       <PlusIcon className='w-4 h-4' />
                       <span className='hidden sm:inline'>新しい会話</span>
@@ -403,9 +391,6 @@ const Chat: React.FC = () => {
                   <span>Enter: 送信 {isComposing && '(変換中)'}</span>
                   <span>Shift+Enter: 改行</span>
                   <span>↑/↓: 履歴</span>
-                  <span>/: 入力にフォーカス</span>
-                  {isAuthenticated && <span>Ctrl+N: 新規会話</span>}
-                  <span>Ctrl+Shift+C: クリア</span>
                 </div>
               </div>
             </>
