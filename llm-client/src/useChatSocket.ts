@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Message } from './components/Dialog'
 
-export const useChatSocket = () => {
+export const useChatSocket = (selectedGenre: string | null = null) => {
   const introText = "こんにちは、法律相談LawFlowです。刑事事件の法律相談に無料で回答します。以下の注意事項をお読みいただいた上で、ご相談ください。\n＊注意事項＊\n○本サービスによる回答がユーザー様のご希望に沿ったり有益であることやいかなる誤りもないことは保証できません。\n○本サービスの利用に起因してユーザー様に生じたあらゆる損害について一切の責任を負いません。\n○投稿した発言は削除できません\n○正確に回答できない可能性がありますので、弁護士に相談するなどして、回答の正確性を確保するようにしてください。"
   const welcomeText = "こんにちは。ご相談やご質問があればお気軽にお知らせください。"
   const [inputText, setInputText] = useState<string>('')
@@ -12,6 +12,12 @@ export const useChatSocket = () => {
     { speakerId: 0, text: introText },
     { speakerId: 0, text: welcomeText }
   ])
+  const genreRef = useRef<string | null>(selectedGenre)
+
+  // Update genre ref when it changes
+  useEffect(() => {
+    genreRef.current = selectedGenre
+  }, [selectedGenre])
   
   const addMessage = useCallback(
     (speakerId: number, text: string) => {
@@ -75,13 +81,18 @@ export const useChatSocket = () => {
     var arr = messages.concat([{speakerId:1, text: inputText}])
     var arr = arr.slice(1);
     console.log("arr> ", arr)
-    var json_string = JSON.stringify(arr);
+
+    // Include genre information if selected
+    const payload: any = { messages: arr }
+    if (genreRef.current) {
+      payload.genre = genreRef.current
+      console.log("genre> ", genreRef.current)
+    }
+
+    var json_string = JSON.stringify(payload);
     console.log("json> ", json_string)
-    //socketRef.current?.send(inputText)
     socketRef.current?.send(json_string)
     setInputText('')
-
-    
 
   }, [addMessage, setInputText, inputText, messages])
   return { inputText, setInputText, messages, onSubmit, chunk, setChunk}

@@ -112,8 +112,22 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):
                 is_processing = True
 
             try:
-                hist = json.loads(json_string)
+                data = json.loads(json_string)
+                print("DATA ", data)
+
+                # Support both old format (array) and new format (object with messages and genre)
+                if isinstance(data, list):
+                    # Old format: direct array of messages
+                    hist = data
+                    genre = None
+                else:
+                    # New format: object with messages and optional genre
+                    hist = data.get("messages", [])
+                    genre = data.get("genre", None)
+
                 print("HIST ", hist)
+                print("GENRE ", genre)
+
                 acc = []
                 for h in hist:
                     if h["speakerId"] == 1:
@@ -132,7 +146,7 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):
                     )
                     await db.messages.insert_one(user_msg.dict(by_alias=True))
 
-                rep = c.reply(acc)
+                rep = c.reply(acc, genre=genre)
                 response_text = ""
 
                 await ws.send_json({'text': '<start>'})

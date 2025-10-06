@@ -3,7 +3,7 @@ import { Message } from './components/Dialog'
 import { storage } from './utils/storage'
 import { getWebSocketUrl } from './services/api.config'
 
-export const useChatSocketAuth = (conversationId: string | null) => {
+export const useChatSocketAuth = (conversationId: string | null, selectedGenre: string | null = null) => {
   const introText = "こんにちは、法律相談LawFlowです。刑事事件の法律相談に無料で回答します。以下の注意事項をお読みいただいた上で、ご相談ください。\n＊注意事項＊\n○本サービスによる回答がユーザー様のご希望に沿ったり有益であることやいかなる誤りもないことは保証できません。\n○本サービスの利用に起因してユーザー様に生じたあらゆる損害について一切の責任を負いません。\n○投稿した発言は削除できません\n○正確に回答できない可能性がありますので、弁護士に相談するなどして、回答の正確性を確保するようにしてください。"
   const welcomeText = "こんにちは。ご相談やご質問があればお気軽にお知らせください。"
 
@@ -19,6 +19,12 @@ export const useChatSocketAuth = (conversationId: string | null) => {
   const socketRef = useRef<WebSocket>()
   const chunkAccumulator = useRef<string>('')
   const hasWelcomeRef = useRef<boolean>(true)
+  const genreRef = useRef<string | null>(selectedGenre)
+
+  // Update genre ref when it changes
+  useEffect(() => {
+    genreRef.current = selectedGenre
+  }, [selectedGenre])
 
   const connectWebSocket = useCallback(() => {
     const token = storage.getToken()
@@ -144,13 +150,21 @@ export const useChatSocketAuth = (conversationId: string | null) => {
     // Send to WebSocket
     const token = storage.getToken()
     if (token) {
-      // For authenticated users, send in the new format
-      socketRef.current.send(JSON.stringify({
-        messages: arr
-      }))
+      // For authenticated users, send in the new format with genre
+      const payload: any = { messages: arr }
+      if (genreRef.current) {
+        payload.genre = genreRef.current
+        console.log("genre> ", genreRef.current)
+      }
+      socketRef.current.send(JSON.stringify(payload))
     } else {
-      // For guests, use the old format
-      socketRef.current.send(JSON.stringify(arr))
+      // For guests, use the old format with genre
+      const payload: any = { messages: arr }
+      if (genreRef.current) {
+        payload.genre = genreRef.current
+        console.log("genre> ", genreRef.current)
+      }
+      socketRef.current.send(JSON.stringify(payload))
     }
 
     setInputText('')

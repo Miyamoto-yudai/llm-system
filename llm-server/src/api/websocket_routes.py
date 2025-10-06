@@ -133,7 +133,9 @@ async def handle_authenticated_chat(ws: WebSocket, token: str, conversation_id: 
 
                 # Process chat message
                 hist = data.get("messages", [])
+                genre = data.get("genre", None)
                 print("HIST ", hist)
+                print("GENRE ", genre)
 
                 acc = []
                 for h in hist:
@@ -198,7 +200,7 @@ async def handle_authenticated_chat(ws: WebSocket, token: str, conversation_id: 
                                 )
 
                 # Generate response
-                rep = c.reply(acc)
+                rep = c.reply(acc, genre=genre)
                 response_text = ""
 
                 await ws.send_json({'text': '<start>'})
