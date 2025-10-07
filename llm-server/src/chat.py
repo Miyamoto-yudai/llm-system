@@ -6,6 +6,7 @@ from functools import lru_cache
 
 import src.predict_crime_type as pct
 import src.config as config
+from src.rag_manager import get_rag_manager
 
 
 MAX_CLARIFY_ROUNDS = 5
@@ -204,8 +205,8 @@ class ClarificationManager:
                     intro_lines.append(f"・{fact}")
                 intro_lines.append("")
 
-                if big_category:
-                    intro_lines.append(f"想定される大分類: {big_category}")
+                # if big_category:
+                #     intro_lines.append(f"想定される大分類: {big_category}")
 
                 if response_type_value == 'predict_crime_and_punishment':
                     intro_lines.append("罪名と量刑を総合的に判断するため、以下の情報を教えてください。")
@@ -1003,11 +1004,50 @@ def simple_reply(hist, add_optional_questions=True):
             yield optional_questions
 
 
-def predict_crime_and_punishment(hist, add_optional_questions=True):
+def predict_crime_and_punishment(hist, add_optional_questions=True, use_rag=False):
     """
     罪名と量刑を統合して予測する関数
     罪名を特定した後、その罪名に基づいて量刑を予測する
+
+    Args:
+        hist: 会話履歴
+        add_optional_questions: 任意の追加質問を付与するか
+        use_rag: RAGを使用するか
     """
+    # RAGを使用する場合
+    if use_rag and config.is_rag_enabled():
+        try:
+            # 会話履歴からユーザーのテキストを結合
+            incident_text = '\n'.join([h['content'] for h in hist if h.get('role') == 'user'])
+
+            rag_manager = get_rag_manager()
+            result = rag_manager.predict_crime_and_sentencing_with_rag(incident_text)
+
+            # 罪名と量刑を結合して返す
+            response_text = f"""【罪名予測（RAG）】
+{result['crime_names']}
+
+【量刑予測（RAG）】
+{result['sentencing']}
+"""
+            yield response_text
+
+            # 任意の追加質問を生成して付与
+            if add_optional_questions and optional_follow_up_manager.should_add_optional_questions(hist, {"type": "predict_crime_and_punishment"}):
+                optional_questions = optional_follow_up_manager.generate_optional_questions(
+                    hist,
+                    {"type": "predict_crime_and_punishment"},
+                    response_text
+                )
+                if optional_questions:
+                    yield optional_questions
+            return
+
+        except Exception as e:
+            logging.error(f"RAG prediction failed: {e}")
+            yield f"RAGを使用した予測でエラーが発生しました。通常モードで続行します。\n\n"
+
+    # 通常モード（既存の実装）
     inst = """あなたは優秀な弁護士です。相談者の状況を分析し、以下の形式で回答してください。
 
 【罪名予測】
@@ -1068,7 +1108,7 @@ def predict_crime_and_punishment(hist, add_optional_questions=True):
             yield optional_questions
 
                 
-def reply(hist, genre=None):
+def reply(hist, genre=None, use_rag=False):
     """
     chat_docsは刑法や刑訴法の条解など
     今後のアップデートが切り分けるようにしたい
@@ -1076,6 +1116,7 @@ def reply(hist, genre=None):
     Args:
         hist: 会話履歴
         genre: 相談ジャンル (criminal, traffic, violence, property, drugs, other)
+        use_rag: RAGを使用するか
     """
     if not hist:
         return WELCOME_MESSAGE
@@ -1145,11 +1186,17 @@ def reply(hist, genre=None):
 
     # 詳細が十分な場合は通常の回答処理（任意質問付き）
     if rt == 'predict_crime_and_punishment':
-        print("＞罪名と量刑の統合予測")
-        return predict_crime_and_punishment(hist)
+        if use_rag:
+            print("＞罪名と量刑の統合予測（RAG使用）")
+        else:
+            print("＞罪名と量刑の統合予測")
+        return predict_crime_and_punishment(hist, use_rag=use_rag)
     elif rt == 'predict_crime_type':
-        print("＞罪名予測")
-        return pct.answer(hist)
+        if use_rag:
+            print("＞罪名予測（RAG使用）")
+        else:
+            print("＞罪名予測")
+        return pct.answer(hist, use_rag=use_rag)
     elif rt == 'predict_punishment':
         print("＞量刑予測")
         return simple_reply(hist)
