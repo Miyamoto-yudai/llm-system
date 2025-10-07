@@ -9,6 +9,7 @@ import Header from './components/Header'
 import Footer from './components/Footer'
 import Chat from './components/Chat'
 import ComparisonMode from './components/ComparisonMode'
+import RagComparisonMode from './components/RagComparisonMode'
 import CompanyPage from './pages/Company'
 import TermsPage from './pages/Terms'
 import PrivacyPolicyPage from './pages/PrivacyPolicy'
@@ -54,7 +55,10 @@ function App() {
           <Routes>
             <Route path="/" element={<Chat />} />
             {isComparisonModeEnabled && (
-              <Route path="/comparison" element={<ComparisonMode />} />
+              <>
+                <Route path="/comparison" element={<ComparisonMode />} />
+                <Route path="/comparison/rag" element={<RagComparisonMode />} />
+              </>
             )}
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/auth/error" element={<AuthCallback />} />

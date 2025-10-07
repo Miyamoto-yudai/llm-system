@@ -120,13 +120,17 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):
                     # Old format: direct array of messages
                     hist = data
                     genre = None
+                    use_rag = config.is_rag_enabled()  # Use RAG if enabled by default
                 else:
-                    # New format: object with messages and optional genre
+                    # New format: object with messages and optional genre and use_rag
                     hist = data.get("messages", [])
                     genre = data.get("genre", None)
+                    # Default to ENABLE_RAG setting if not explicitly specified
+                    use_rag = data.get("use_rag", config.is_rag_enabled())
 
                 print("HIST ", hist)
                 print("GENRE ", genre)
+                print("USE_RAG ", use_rag)
 
                 acc = []
                 for h in hist:
@@ -146,7 +150,7 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):
                     )
                     await db.messages.insert_one(user_msg.dict(by_alias=True))
 
-                rep = c.reply(acc, genre=genre)
+                rep = c.reply(acc, genre=genre, use_rag=use_rag)
                 response_text = ""
 
                 await ws.send_json({'text': '<start>'})

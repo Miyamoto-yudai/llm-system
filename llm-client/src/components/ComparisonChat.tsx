@@ -13,7 +13,8 @@ interface ComparisonChatProps {
   messages: Message[]
   chunks: string[]
   isProcessing: boolean
-  variant: 'with-data' | 'without-data'
+  variant: 'with-data' | 'without-data' | 'with-rag' | 'without-rag'
+  subtitle?: string  // オプショナルなサブタイトル
 }
 
 const ComparisonChat: React.FC<ComparisonChatProps> = ({
@@ -21,7 +22,8 @@ const ComparisonChat: React.FC<ComparisonChatProps> = ({
   messages,
   chunks,
   isProcessing,
-  variant
+  variant,
+  subtitle
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -31,22 +33,30 @@ const ComparisonChat: React.FC<ComparisonChatProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, chunks])
 
-  const bgColor = variant === 'with-data' ? 'bg-blue-50' : 'bg-green-50'
-  const borderColor = variant === 'with-data' ? 'border-blue-200' : 'border-green-200'
-  const titleBgColor = variant === 'with-data' ? 'bg-blue-600' : 'bg-green-600'
-  const assistantBgColor = variant === 'with-data' ? 'bg-blue-100' : 'bg-green-100'
-  const assistantIconColor = variant === 'with-data' ? 'text-blue-600' : 'text-green-600'
+  const isWithVariant = variant === 'with-data' || variant === 'with-rag'
+  const bgColor = isWithVariant ? 'bg-blue-50' : 'bg-green-50'
+  const borderColor = isWithVariant ? 'border-blue-200' : 'border-green-200'
+  const titleBgColor = isWithVariant ? 'bg-blue-600' : 'bg-green-600'
+  const assistantBgColor = isWithVariant ? 'bg-blue-100' : 'bg-green-100'
+  const assistantIconColor = isWithVariant ? 'text-blue-600' : 'text-green-600'
+
+  // デフォルトのサブタイトル（指定されていない場合）
+  const defaultSubtitle = variant === 'with-data'
+    ? '罪名予測テーブル・量刑予測シート使用'
+    : variant === 'without-data'
+    ? 'LLMプロンプトのみ使用'
+    : ''  // RAGモードではサブタイトルなし
 
   return (
     <div className={`flex flex-col h-full ${bgColor} rounded-lg border ${borderColor} overflow-hidden`}>
       {/* Header */}
       <div className={`${titleBgColor} text-white px-4 py-3`}>
         <h3 className="font-semibold text-lg">{title}</h3>
-        <p className="text-sm opacity-90 mt-1">
-          {variant === 'with-data'
-            ? '罪名予測テーブル・量刑予測シート使用'
-            : 'LLMプロンプトのみ使用'}
-        </p>
+        {(subtitle !== undefined ? subtitle : defaultSubtitle) && (
+          <p className="text-sm opacity-90 mt-1">
+            {subtitle !== undefined ? subtitle : defaultSubtitle}
+          </p>
+        )}
       </div>
 
       {/* Messages */}

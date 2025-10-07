@@ -11,6 +11,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 import src.chat as c
 from src.utils.title_generator import generate_conversation_title
+from src.config import is_rag_enabled
 
 
 async def handle_authenticated_chat(ws: WebSocket, token: str, conversation_id: Optional[str] = None):
@@ -200,7 +201,8 @@ async def handle_authenticated_chat(ws: WebSocket, token: str, conversation_id: 
                                 )
 
                 # Generate response
-                rep = c.reply(acc, genre=genre)
+                use_rag = is_rag_enabled()
+                rep = c.reply(acc, genre=genre, use_rag=use_rag)
                 response_text = ""
 
                 await ws.send_json({'text': '<start>'})

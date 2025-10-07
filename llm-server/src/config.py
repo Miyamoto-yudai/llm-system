@@ -38,7 +38,7 @@ GPT_MODELS = {
 TEMPERATURE_SETTINGS = {
     "main": 0,              # 正確性重視
     "classifier": 0,        # 確実な分類
-    "question_generator": 0.2,  # 少し柔軟性を持たせる
+    "question_generator": 0,  # 少し柔軟性を持たせる
     "streaming": 0         # 正確性重視
 }
 
@@ -52,6 +52,11 @@ SETTINGS = {
 # 比較モードの設定（開発環境でのみ有効）
 COMPARISON_MODE_ENABLED = os.getenv("ENABLE_COMPARISON_MODE", "false").lower() == "true"
 
+# RAG設定
+RAG_ENABLED = os.getenv("ENABLE_RAG", "false").lower() == "true"
+VECTOR_STORE_ID = os.getenv("VECTOR_STORE_ID", "")
+RAG_ONLY_MODE = os.getenv("RAG_ONLY_MODE", "false").lower() == "true"
+
 
 @lru_cache
 def get_openai_client() -> OpenAI:
@@ -60,7 +65,10 @@ def get_openai_client() -> OpenAI:
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY が設定されていません。llm-server/.env を確認してください。")
 
-    client_args = {"api_key": api_key}
+    client_args = {
+        "api_key": api_key,
+        "default_headers": {"OpenAI-Beta": "assistants=v2"}
+    }
 
     project = os.getenv("OPENAI_PROJECT")
     if project:
@@ -92,11 +100,23 @@ def get_model(purpose="main"):
 def get_temperature(purpose="main"):
     """
     用途に応じたtemperatureを取得
-    
+
     Args:
         purpose (str): 用途を指定
-    
+
     Returns:
         float: temperature値
     """
     return TEMPERATURE_SETTINGS.get(purpose, 0)
+
+def get_vector_store_id():
+    """Vector Store IDを取得"""
+    return VECTOR_STORE_ID
+
+def get_rag_only_mode():
+    """RAG強制モードの設定を取得"""
+    return RAG_ONLY_MODE
+
+def is_rag_enabled():
+    """RAGが有効かどうかを取得"""
+    return RAG_ENABLED

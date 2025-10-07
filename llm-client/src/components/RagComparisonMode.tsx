@@ -4,22 +4,23 @@ import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 import ComparisonChat from './ComparisonChat'
 import QuickTemplates from './QuickTemplates'
-import { useComparisonSocket } from '../hooks/useComparisonSocket'
+import { useRagComparisonSocket } from '../hooks/useRagComparisonSocket'
 import toast from 'react-hot-toast'
 
-const ComparisonMode: React.FC = () => {
+const RagComparisonMode: React.FC = () => {
   const {
-    messagesWithData,
-    messagesWithoutData,
-    chunkWithData,
-    chunkWithoutData,
+    messagesWithRag,
+    messagesWithoutRag,
+    chunkWithRag,
+    chunkWithoutRag,
     inputText,
     setInputText,
     onSubmit,
     resetChat,
     isConnected,
-    isProcessing
-  } = useComparisonSocket()
+    isProcessing,
+    responseType
+  } = useRagComparisonSocket()
 
   const [isComposing, setIsComposing] = useState(false)
 
@@ -38,23 +39,27 @@ const ComparisonMode: React.FC = () => {
     const exportData = {
       timestamp: new Date().toISOString(),
       comparison: {
-        with_data: messagesWithData,
-        without_data: messagesWithoutData
+        with_rag: messagesWithRag,
+        without_rag: messagesWithoutRag
       },
       statistics: {
-        with_data: {
-          total_messages: messagesWithData.length,
-          clarifying_questions: messagesWithData.filter(m =>
+        with_rag: {
+          total_messages: messagesWithRag.length,
+          clarifying_questions: messagesWithRag.filter(m =>
             m.speakerId === 0 && m.text.includes('【確認ステップ')
+          ).length,
+          rag_indicators: messagesWithRag.filter(m =>
+            m.speakerId === 0 && (m.text.includes('【罪名予測（RAG）】') || m.text.includes('【量刑予測（RAG）】'))
           ).length
         },
-        without_data: {
-          total_messages: messagesWithoutData.length,
-          clarifying_questions: messagesWithoutData.filter(m =>
+        without_rag: {
+          total_messages: messagesWithoutRag.length,
+          clarifying_questions: messagesWithoutRag.filter(m =>
             m.speakerId === 0 && m.text.includes('【確認ステップ')
           ).length
         }
-      }
+      },
+      response_type: responseType
     }
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], {
@@ -63,14 +68,25 @@ const ComparisonMode: React.FC = () => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `comparison-${Date.now()}.json`
+    a.download = `rag-comparison-${Date.now()}.json`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success('比較結果をエクスポートしました')
+    toast.success('RAG比較結果をエクスポートしました')
   }
 
   const handleTemplateSelect = (template: string) => {
     setInputText(template)
+  }
+
+  // 応答タイプの日本語表示
+  const getResponseTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      'predict_crime_type': '罪名予測',
+      'predict_punishment': '量刑予測',
+      'predict_crime_and_punishment': '罪名・量刑統合予測',
+      'legal_process': '法プロセス'
+    }
+    return labels[type] || type
   }
 
   return (
@@ -88,18 +104,23 @@ const ComparisonMode: React.FC = () => {
             </Link>
             <div className="border-l border-gray-300 h-6 mx-2" />
             <div>
-              <h1 className="text-xl font-bold text-gray-800">比較検証モード（データあり/なし）</h1>
+              <h1 className="text-xl font-bold text-gray-800">RAG比較検証モード</h1>
               <p className="text-sm text-gray-600">
-                深掘り質問の出力傾向を比較
+                RAGあり/なしの予測精度を比較
                 {!isConnected && (
                   <span className="ml-2 text-red-600">(未接続)</span>
                 )}
+                {responseType && (
+                  <span className="ml-2 text-blue-600">
+                    （{getResponseTypeLabel(responseType)}）
+                  </span>
+                )}
                 <span className="mx-2">|</span>
                 <Link
-                  to="/comparison/rag"
+                  to="/comparison"
                   className="text-blue-600 hover:underline"
                 >
-                  RAG比較モードに切り替え
+                  データあり/なし比較モードに切り替え
                 </Link>
               </p>
             </div>
@@ -108,7 +129,7 @@ const ComparisonMode: React.FC = () => {
             <button
               onClick={handleExport}
               className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-              disabled={messagesWithData.length === 0}
+              disabled={messagesWithRag.length === 0}
             >
               <FaDownload className="w-4 h-4" />
               <span>エクスポート</span>
@@ -129,18 +150,20 @@ const ComparisonMode: React.FC = () => {
         {/* Chat panels */}
         <div className="flex-1 grid grid-cols-2 gap-4 overflow-hidden">
           <ComparisonChat
-            title="データあり（現状方式）"
-            messages={messagesWithData}
-            chunks={chunkWithData}
+            title="RAGあり（判例参照）"
+            messages={messagesWithRag}
+            chunks={chunkWithRag}
             isProcessing={isProcessing}
-            variant="with-data"
+            variant="with-rag"
+            subtitle=""
           />
           <ComparisonChat
-            title="LLMのみ"
-            messages={messagesWithoutData}
-            chunks={chunkWithoutData}
+            title="RAGなし（通常モード）"
+            messages={messagesWithoutRag}
+            chunks={chunkWithoutRag}
             isProcessing={isProcessing}
-            variant="without-data"
+            variant="without-rag"
+            subtitle=""
           />
         </div>
 
@@ -169,7 +192,7 @@ const ComparisonMode: React.FC = () => {
                   handleSubmit()
                 }
               }}
-              placeholder="両方のモードで同じ質問を送信します..."
+              placeholder="両方のモード（RAGあり/なし）で同じ質問を送信します..."
               disabled={!isConnected || isProcessing}
               rows={2}
             />
@@ -204,30 +227,49 @@ const ComparisonMode: React.FC = () => {
           <h3 className="font-semibold text-gray-800 mb-2">比較統計</h3>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-gray-600">データあり: </span>
-              <span className="font-medium">
-                深掘り質問 {
-                  messagesWithData.filter(m =>
-                    m.speakerId === 0 && m.text.includes('【確認ステップ')
-                  ).length
-                }回
-              </span>
+              <div className="text-gray-600 mb-1">RAGあり:</div>
+              <div className="space-y-1">
+                <div>
+                  <span className="text-gray-500">深掘り質問: </span>
+                  <span className="font-medium">
+                    {messagesWithRag.filter(m =>
+                      m.speakerId === 0 && m.text.includes('【確認ステップ')
+                    ).length}回
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">RAG使用回数: </span>
+                  <span className="font-medium">
+                    {messagesWithRag.filter(m =>
+                      m.speakerId === 0 && (m.text.includes('【罪名予測（RAG）】') || m.text.includes('【量刑予測（RAG）】'))
+                    ).length}回
+                  </span>
+                </div>
+              </div>
             </div>
             <div>
-              <span className="text-gray-600">LLMのみ: </span>
-              <span className="font-medium">
-                深掘り質問 {
-                  messagesWithoutData.filter(m =>
-                    m.speakerId === 0 && m.text.includes('【確認ステップ')
-                  ).length
-                }回
-              </span>
+              <div className="text-gray-600 mb-1">RAGなし:</div>
+              <div className="space-y-1">
+                <div>
+                  <span className="text-gray-500">深掘り質問: </span>
+                  <span className="font-medium">
+                    {messagesWithoutRag.filter(m =>
+                      m.speakerId === 0 && m.text.includes('【確認ステップ')
+                    ).length}回
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* Notice */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+          <strong>注意:</strong> RAG機能を使用するには、サーバー側で<code className="bg-blue-100 px-1 py-0.5 rounded">ENABLE_RAG=true</code>と<code className="bg-blue-100 px-1 py-0.5 rounded">VECTOR_STORE_ID</code>の設定が必要です。
         </div>
       </div>
     </div>
   )
 }
 
-export default ComparisonMode
+export default RagComparisonMode

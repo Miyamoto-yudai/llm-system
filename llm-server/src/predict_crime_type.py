@@ -12,6 +12,7 @@ from tqdm import tqdm_notebook as tqdm
 
 import src.gen.chat as chat
 import src.config as config
+from src.rag_manager import get_rag_manager
 
 
 
@@ -88,7 +89,36 @@ def make_inst(sheet_name, csv):
     
     return inst
 
-def answer(hist):
+def answer(hist, add_optional_questions=True, use_rag=False):
+    """
+    罪名予測を実行
+
+    Args:
+        hist: 会話履歴
+        add_optional_questions: 任意の追加質問を付与するか（未使用、互換性のため）
+        use_rag: RAGを使用するか
+    """
+    # RAGを使用する場合
+    if use_rag and config.is_rag_enabled():
+        try:
+            # 会話履歴からユーザーのテキストを結合
+            incident_text = '\n'.join([h['content'] for h in hist if h.get('role') == 'user'])
+
+            rag_manager = get_rag_manager()
+            result = rag_manager.predict_crime_with_rag(incident_text)
+
+            # ジェネレータとして返す
+            def rag_generator():
+                yield "【罪名予測（RAG）】\n"
+                yield result
+
+            return rag_generator()
+
+        except Exception as e:
+            logging.error(f"RAG crime prediction failed: {e}")
+            # エラー時は通常モードにフォールバック
+
+    # 通常モード（既存の実装）
     dicision = ''.join(gen(macro_inst, hist))
     print(dicision)
     if not "MOVE" in dicision:
