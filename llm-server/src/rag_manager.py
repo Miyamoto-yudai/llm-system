@@ -20,53 +20,60 @@ class RAGAssistantManager:
         self.vector_store_id = config.get_vector_store_id()
         self.rag_only_mode = config.get_rag_only_mode()
 
-    def _format_sentencing_json(self, json_str: str) -> str:
-        """量刑予測のJSON結果を読みやすく整形"""
+    def _format_sentencing_result(self, result_text: str) -> str:
+        """量刑予測の結果を整形（新形式は自然な文章なのでそのまま返す）"""
+        # 新形式は自然な文章形式なので、特別な整形は不要
+        # ただし、旧形式（JSON）の場合は下位互換性のために整形を試みる
         try:
             # JSONを抽出（```json...```で囲まれている場合もある）
-            json_match = re.search(r'```json\s*(.*?)\s*```', json_str, re.DOTALL)
+            json_match = re.search(r'```json\s*(.*?)\s*```', result_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
+                data = json.loads(json_str)
 
-            # JSONをパース
-            data = json.loads(json_str)
+                # 旧形式（罪名ごとのJSON）を検出した場合のみ整形
+                if isinstance(data, dict) and any(isinstance(v, dict) for v in data.values()):
+                    formatted_lines = []
+                    for crime_name, sentencing_info in data.items():
+                        formatted_lines.append(f"\n【{crime_name}の量刑】")
 
-            formatted_lines = []
-            for crime_name, sentencing_info in data.items():
-                formatted_lines.append(f"\n【{crime_name}の量刑】")
+                        if isinstance(sentencing_info, dict) and 'priorities' in sentencing_info:
+                            priorities = sentencing_info.get('priorities', [])
+                            sentencing_details = sentencing_info.get('sentencing_details', [])
+                            reasoning = sentencing_info.get('reasoning', [])
+                            advice = sentencing_info.get('advice', [])
 
-                # 優先順位
-                if sentencing_info and len(sentencing_info) > 0:
-                    priorities = sentencing_info[0]
-                    priority_list = []
-                    for key in sorted(priorities.keys()):
-                        priority_list.append(priorities[key])
-                    formatted_lines.append(f"量刑の種類（優先順位順）: {' → '.join(priority_list)}")
+                            formatted_lines.append("\n■ 予想される量刑（可能性が高い順）")
+                            for idx, detail in enumerate(sentencing_details, 1):
+                                sent_type = detail.get('type', '')
+                                if sent_type == '執行猶予付き懲役':
+                                    formatted_lines.append(
+                                        f"{idx}. {sent_type}: 懲役{detail.get('min_value', '?')}〜{detail.get('max_value', '?')}、"
+                                        f"執行猶予{detail.get('min_suspended_sentence_value', '?')}〜{detail.get('max_suspended_sentence_value', '?')}"
+                                    )
+                                else:
+                                    formatted_lines.append(
+                                        f"{idx}. {sent_type}: {detail.get('min_value', '?')}〜{detail.get('max_value', '?')}"
+                                    )
 
-                # 各量刑の詳細
-                if len(sentencing_info) > 1:
-                    for item in sentencing_info[1:]:
-                        if 'type' in item:
-                            sent_type = item['type']
-                            if sent_type == '執行猶予付き懲役':
-                                formatted_lines.append(
-                                    f"  • {sent_type}: 懲役{item.get('min_value', '?')}〜{item.get('max_value', '?')}、"
-                                    f"執行猶予{item.get('min_suspended_sentence_value', '?')}〜{item.get('max_suspended_sentence_value', '?')}"
-                                )
-                            else:
-                                formatted_lines.append(
-                                    f"  • {sent_type}: {item.get('min_value', '?')}〜{item.get('max_value', '?')}"
-                                )
+                            if reasoning:
+                                formatted_lines.append("\n■ 量刑判断の根拠")
+                                for reason in reasoning:
+                                    formatted_lines.append(f"  - {reason}")
 
-            return '\n'.join(formatted_lines)
+                            if advice:
+                                formatted_lines.append("\n■ 今後のアドバイス")
+                                for adv in advice:
+                                    formatted_lines.append(f"  - {adv}")
 
-        except json.JSONDecodeError as e:
-            logging.warning(f"Failed to parse sentencing JSON: {e}")
-            # パースに失敗した場合は元の文字列を返す
-            return json_str
-        except Exception as e:
-            logging.warning(f"Failed to format sentencing: {e}")
-            return json_str
+                    return '\n'.join(formatted_lines)
+
+        except (json.JSONDecodeError, Exception) as e:
+            # JSON解析に失敗した場合は、新形式の自然な文章として扱う
+            logging.debug(f"Not JSON format, treating as natural text: {e}")
+
+        # 新形式（自然な文章）の場合はそのまま返す
+        return result_text
 
     def _create_crime_prediction_assistant(self, rag_only: bool = False):
         """罪名予測用のAssistantを作成"""
@@ -77,14 +84,23 @@ class RAGAssistantManager:
         instructions = f"""
 ### 指示文
 ユーザーが入力する法的案件に対して「最も確率の高い罪」を三つ予測してください。
-また、罪名のみを番号付きリスト形式で出力し、その補足等は出力を禁止します。
+各罪名について、該当する法律の条文と簡潔な根拠を添えて出力してください。
 被害者が複数人いる場合はそれに対応した複数罪名をまとめた呼称で出力してください。
 {rag_instruction}
 
 ### 出力形式
-1. 〇〇
-2. xxx
-3. ……
+1. 〇〇罪（刑法第XX条）
+   - 該当理由: [簡潔な根拠]
+
+2. XX罪（刑法第YY条）
+   - 該当理由: [簡潔な根拠]
+
+3. △△罪（刑法第ZZ条）
+   - 該当理由: [簡潔な根拠]
+
+### 注意事項
+- 根拠は1〜2行程度で簡潔に記載してください
+- 該当する構成要件や重要な事実関係を明記してください
 """
 
         # Create assistant with file_search tool and vector store (v2 API)
@@ -110,23 +126,33 @@ class RAGAssistantManager:
         instructions = f"""
 ### 指示文
 与えられた罪名を参考に、ユーザーが入力する法的案件の具体的な量刑を予測してください。
-なお、解説等は出力しないでください。
+複数の罪名が提示されている場合でも、量刑予測・根拠・アドバイスは全体として1つにまとめてください。
+
 罰金刑であればその罰金額を10万円単位で、
 執行猶予付き懲役刑であれば執行猶予期間を1年単位で、
 実刑であれば刑期を半年単位で予測してください。
 また、一定程度幅を持たせて予測してください。
+
+以下の情報を含めてください:
+1. 予想される量刑（可能性が高い順）
+2. 量刑判断の根拠（考慮すべき情状など）
+3. 今後のアドバイス（示談の重要性、弁護士相談など）
 {rag_instruction}
 
 ### 出力形式
-出力形式は出力例を参考にJSON形式にしてください。
-まず最初にあり得るであろう量刑の種類(罰金、執行猶予付き懲役、懲役)を優先順位順に並べてください。
-また、その際にありえないであろう量刑は入れなくて良いです。
-その後、それらの量刑の最小値、最大値を量刑の種類と合わせて記述してください。
+以下の形式で自然な文章として出力してください：
 
-### 出力例
-{{"〇〇罪":[{{"1": "罰金", "2": "執行猶予付き懲役", "3": "懲役"}}, {{'type':'罰金', 'min_value':'50万円', 'max_value':'150万円'}}, {{'type':'執行猶予付き懲役' ,'min_value':'1年', 'max_value': '3年' ,'min_suspended_sentence_value':'2年', 'max_suspended_sentence_value': '4年'}}, {{'type':'懲役', 'min_value': '2年', 'max_value': '3年'}}],
-"xx罪":[{{"1": "罰金", "2": "執行猶予付き懲役", "3": "懲役"}}, {{'type':'罰金', 'min_value':'50万円', 'max_value':'150万円'}}, {{'type':'執行猶予付き懲役' ,'min_value':'1年', 'max_value': '3年' ,'min_suspended_sentence_value':'2年', 'max_suspended_sentence_value': '4年'}}, {{'type':'懲役', 'min_value': '2年', 'max_value': '3年'}}],
-"□□罪":[{{"1": "罰金", "2": "執行猶予付き懲役", "3": "懲役"}}, {{'type':'罰金', 'min_value':'50万円', 'max_value':'150万円'}}, {{'type':'執行猶予付き懲役' ,'min_value':'1年', 'max_value': '3年' ,'min_suspended_sentence_value':'2年', 'max_suspended_sentence_value': '4年'}}, {{'type':'懲役', 'min_value': '2年', 'max_value': '3年'}}]}}
+【量刑予測】
+予想される量刑を可能性が高い順に記載してください。
+例：「最も可能性が高いのは罰金50万円〜150万円です。示談が成立しない場合は執行猶予付き懲役1年〜3年（執行猶予2年〜4年）となる可能性があります。」
+
+【量刑判断の根拠】
+量刑判断の主要な根拠となる要素を箇条書きで3〜5項目示してください。
+
+【今後のアドバイス】
+今後のアドバイスを箇条書きで2〜3項目示してください。
+
+注意：複数の罪名が提示されている場合でも、量刑予測は1つにまとめてください。罪名ごとに別々の量刑を提示しないでください。
 """
 
         # Create assistant with file_search tool and vector store (v2 API)
@@ -243,8 +269,8 @@ class RAGAssistantManager:
                         for content in message.content:
                             if hasattr(content, 'text'):
                                 result = content.text.value
-                                # JSON形式の結果を整形
-                                formatted_result = self._format_sentencing_json(result)
+                                # 結果を整形（新形式は自然な文章、旧形式はJSON）
+                                formatted_result = self._format_sentencing_result(result)
                                 # クリーンアップ
                                 self._cleanup_assistant(assistant.id)
                                 self._cleanup_thread(thread.id)
