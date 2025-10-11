@@ -93,7 +93,7 @@ async def handle_authenticated_chat(ws: WebSocket, token: str, conversation_id: 
             role="assistant",
             content=greeting
         )
-        await db.messages.insert_one(greeting_msg.dict(by_alias=True))
+        await db.messages.insert_one(greeting_msg.model_dump(by_alias=True))
 
         await db.conversations.update_one(
             {"_id": conv_obj_id},
@@ -157,7 +157,7 @@ async def handle_authenticated_chat(ws: WebSocket, token: str, conversation_id: 
                         user_id=user_id,
                         title=title
                     )
-                    result = await db.conversations.insert_one(conv_model.dict(by_alias=True))
+                    result = await db.conversations.insert_one(conv_model.model_dump(by_alias=True))
                     conversation_id = str(result.inserted_id)
                     conv_obj_id = result.inserted_id
                     is_new_conversation = False
@@ -172,7 +172,7 @@ async def handle_authenticated_chat(ws: WebSocket, token: str, conversation_id: 
                             role="assistant",
                             content=c.WELCOME_MESSAGE
                         )
-                        await db.messages.insert_one(greeting_msg.dict(by_alias=True))
+                        await db.messages.insert_one(greeting_msg.model_dump(by_alias=True))
 
                 # Save user message (skip if no conversation yet)
                 if acc and acc[-1]["role"] == "user" and conversation_id:
@@ -181,7 +181,7 @@ async def handle_authenticated_chat(ws: WebSocket, token: str, conversation_id: 
                         role="user",
                         content=acc[-1]["content"]
                     )
-                    await db.messages.insert_one(user_msg.dict(by_alias=True))
+                    await db.messages.insert_one(user_msg.model_dump(by_alias=True))
 
                     # Update title if it's still "新しい会話" and this is first user message
                     if conversation_id:
@@ -224,7 +224,7 @@ async def handle_authenticated_chat(ws: WebSocket, token: str, conversation_id: 
                         role="assistant",
                         content=response_text
                     )
-                    await db.messages.insert_one(assistant_msg.dict(by_alias=True))
+                    await db.messages.insert_one(assistant_msg.model_dump(by_alias=True))
 
                     # Update conversation's updated_at
                     await db.conversations.update_one(

@@ -15,6 +15,32 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Pydantic v2エラーフォーマット用のヘルパー関数
+interface PydanticError {
+  type: string
+  loc: (string | number)[]
+  msg: string
+  input?: any
+  ctx?: Record<string, any>
+}
+
+function formatPydanticError(detail: string | PydanticError[] | undefined): string {
+  if (!detail) return '不明なエラーが発生しました'
+
+  // 文字列の場合はそのまま返す（Pydantic v1互換）
+  if (typeof detail === 'string') return detail
+
+  // 配列の場合はPydantic v2のエラー形式
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail.map(err => {
+      const field = err.loc.slice(1).join('.') // ['body', 'password'] -> 'password'
+      return field ? `${field}: ${err.msg}` : err.msg
+    }).join(', ')
+  }
+
+  return 'バリデーションエラーが発生しました'
+}
+
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
@@ -58,18 +84,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(response.user)
       toast.success('ログインしました')
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'ログインに失敗しました')
+      const errorMessage = formatPydanticError(error.response?.data?.detail) || 'ログインに失敗しました'
+      toast.error(errorMessage)
       throw error
     }
   }
 
   const register = async (credentials: RegisterCredentials) => {
     try {
+      console.log('🔵 Registration attempt:', { username: credentials.username, email: credentials.email, password: '[REDACTED]' })
       const response = await authService.register(credentials)
+      console.log('✅ Registration success:', response.user)
       setUser(response.user)
       toast.success('アカウントを作成しました')
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || '登録に失敗しました')
+      console.error('❌ Registration error:', {
+        status: error.response?.status,
+        detail: error.response?.data?.detail,
+        fullError: error.response?.data
+      })
+      const errorMessage = formatPydanticError(error.response?.data?.detail) || '登録に失敗しました'
+      console.log('📝 Formatted error message:', errorMessage)
+      toast.error(errorMessage)
       throw error
     }
   }

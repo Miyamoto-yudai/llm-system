@@ -2,7 +2,8 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
@@ -12,8 +13,8 @@ from bson import ObjectId
 
 load_dotenv()
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing with Argon2 (modern best practice)
+ph = PasswordHasher()
 
 # JWT settings
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_here_change_in_production")
@@ -25,13 +26,17 @@ security = HTTPBearer()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against a hashed password"""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verify a plain password against a hashed password using Argon2"""
+    try:
+        ph.verify(hashed_password, plain_password)
+        return True
+    except VerifyMismatchError:
+        return False
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password"""
-    return pwd_context.hash(password)
+    """Hash a password using Argon2"""
+    return ph.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -59,6 +64,10 @@ def decode_token(token: str):
 async def authenticate_user(email: str, password: str):
     """Authenticate a user by email and password"""
     db = get_database()
+
+    if db is None:
+        return False
+
     user = await db.users.find_one({"email": email})
 
     if not user:
@@ -89,6 +98,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
     # Verify session is still valid
     db = get_database()
+    if db is None:
+        raise credentials_exception
+
     session = await db.sessions.find_one({
         "token": token,
         "expires_at": {"$gt": datetime.utcnow()}
@@ -126,6 +138,12 @@ async def create_session(user_id: str, request_info: dict = None) -> str:
     """Create a new session for a user"""
     db = get_database()
 
+    if db is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection not available"
+        )
+
     expires_at = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
     token = create_access_token({"sub": str(user_id)})
 
@@ -137,7 +155,7 @@ async def create_session(user_id: str, request_info: dict = None) -> str:
         user_agent=request_info.get("user_agent") if request_info else None
     )
 
-    await db.sessions.insert_one(session.dict(by_alias=True))
+    await db.sessions.insert_one(session.model_dump(by_alias=True))
 
     return token
 

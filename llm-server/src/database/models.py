@@ -1,27 +1,36 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List, Dict, Any, Annotated
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, BeforeValidator
 from bson import ObjectId
 
 
-class PyObjectId(ObjectId):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid objectid")
+# Pydantic v2 ObjectId validator
+def validate_object_id(v: Any) -> ObjectId:
+    if isinstance(v, ObjectId):
+        return v
+    if ObjectId.is_valid(v):
         return ObjectId(v)
+    raise ValueError("Invalid ObjectId")
 
-    @classmethod
-    def __modify_schema__(cls, field_schema):
-        field_schema.update(type="string")
+
+PyObjectId = Annotated[ObjectId, BeforeValidator(validate_object_id)]
 
 
 class UserModel(BaseModel):
-    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str},
+        json_schema_extra={
+            "example": {
+                "username": "john_doe",
+                "email": "john@example.com",
+                "password": "secure_password123"
+            }
+        }
+    )
+
+    id: Optional[PyObjectId] = Field(default_factory=ObjectId, alias="_id")
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     password_hash: str
@@ -32,60 +41,51 @@ class UserModel(BaseModel):
     oauth_providers: List[Dict[str, str]] = []
     profile_picture: Optional[str] = None
 
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
-        schema_extra = {
-            "example": {
-                "username": "john_doe",
-                "email": "john@example.com",
-                "password": "secure_password123"
-            }
-        }
-
 
 class SessionModel(BaseModel):
-    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+
+    id: Optional[PyObjectId] = Field(default_factory=ObjectId, alias="_id")
     user_id: str
     token: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: datetime
-    ip_address: Optional[str]
-    user_agent: Optional[str]
-
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
 
 
 class ConversationModel(BaseModel):
-    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+
+    id: Optional[PyObjectId] = Field(default_factory=ObjectId, alias="_id")
     user_id: str
     title: Optional[str] = "新しい会話"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = {}
 
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
-
 
 class MessageModel(BaseModel):
-    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+
+    id: Optional[PyObjectId] = Field(default_factory=ObjectId, alias="_id")
     conversation_id: str
     role: str  # "user" or "assistant"
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = {}
-
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
 
 
 # Request/Response models for API

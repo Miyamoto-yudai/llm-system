@@ -56,7 +56,7 @@ async def create_conversation(
         title=conversation.title
     )
 
-    result = await db.conversations.insert_one(conv_model.dict(by_alias=True))
+    result = await db.conversations.insert_one(conv_model.model_dump(by_alias=True))
 
     return ConversationResponse(
         id=str(result.inserted_id),
@@ -139,7 +139,7 @@ async def add_message(
         content=message.content
     )
 
-    result = await db.messages.insert_one(msg_model.dict(by_alias=True))
+    result = await db.messages.insert_one(msg_model.model_dump(by_alias=True))
 
     # Update conversation's updated_at
     await db.conversations.update_one(

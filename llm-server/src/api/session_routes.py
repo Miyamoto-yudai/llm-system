@@ -18,6 +18,12 @@ async def register(user: UserCreate, request: Request):
     """Register a new user"""
     db = get_database()
 
+    if db is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection not available"
+        )
+
     # Check if user already exists
     existing_user = await db.users.find_one({
         "$or": [
@@ -39,7 +45,7 @@ async def register(user: UserCreate, request: Request):
         password_hash=get_password_hash(user.password)
     )
 
-    result = await db.users.insert_one(user_model.dict(by_alias=True))
+    result = await db.users.insert_one(user_model.model_dump(by_alias=True))
 
     # Create session
     request_info = {

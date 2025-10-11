@@ -120,7 +120,7 @@ async def get_or_create_oauth_user(provider: str, provider_user_id: str, email: 
         user_model.username = f"{base_username}_{counter}"
         counter += 1
 
-    result = await db.users.insert_one(user_model.dict(by_alias=True))
+    result = await db.users.insert_one(user_model.model_dump(by_alias=True))
     return await db.users.find_one({"_id": result.inserted_id})
 
 

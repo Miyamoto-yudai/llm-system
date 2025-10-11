@@ -3,11 +3,10 @@ import logging
 import json
 import asyncio
 from typing import Optional
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from contextlib import asynccontextmanager
-
 import src.gen.lawflow.lc as lc
 import src.gen.util as u
 import src.chat as c
@@ -27,14 +26,30 @@ def log_chat(last_exchange):
             f.write(f"{entry['role']}: {entry['content']}\n")
         f.write("\n" + "="*50 + "\n")
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Modern lifespan context manager for FastAPI 0.115.6"""
     # Startup
-    await connect_to_mongo()
-    await init_indexes()
+    try:
+        print("Initializing database connection...")
+        await connect_to_mongo()
+        print("Creating database indexes...")
+        await init_indexes()
+        print("Database initialization complete!")
+    except Exception as e:
+        print(f"Error during database initialization: {e}")
+        import traceback
+        traceback.print_exc()
+
     yield
+
     # Shutdown
-    await close_mongo_connection()
+    try:
+        await close_mongo_connection()
+    except Exception as e:
+        print(f"Error during database shutdown: {e}")
+
 
 app = FastAPI(lifespan=lifespan)
 chat_docs1 = u.load("dataset/criminal264.pickle")
@@ -92,13 +107,14 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):
             # Create or get conversation for authenticated user
             if user_id:
                 db = get_database()
-                # Create new conversation
-                conv_model = ConversationModel(
-                    user_id=user_id,
-                    title="新しい会話"
-                )
-                result = await db.conversations.insert_one(conv_model.dict(by_alias=True))
-                conversation_id = str(result.inserted_id)
+                if db is not None:
+                    # Create new conversation
+                    conv_model = ConversationModel(
+                        user_id=user_id,
+                        title="新しい会話"
+                    )
+                    result = await db.conversations.insert_one(conv_model.model_dump(by_alias=True))
+                    conversation_id = str(result.inserted_id)
 
     while True:
         try:
@@ -143,12 +159,13 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):
                 # Save user message if authenticated
                 if conversation_id and acc and acc[-1]["role"] == "user":
                     db = get_database()
-                    user_msg = MessageModel(
-                        conversation_id=conversation_id,
-                        role="user",
-                        content=acc[-1]["content"]
-                    )
-                    await db.messages.insert_one(user_msg.dict(by_alias=True))
+                    if db is not None:
+                        user_msg = MessageModel(
+                            conversation_id=conversation_id,
+                            role="user",
+                            content=acc[-1]["content"]
+                        )
+                        await db.messages.insert_one(user_msg.model_dump(by_alias=True))
 
                 rep = c.reply(acc, genre=genre, use_rag=use_rag)
                 response_text = ""
@@ -169,18 +186,19 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):
                 # Save assistant message if authenticated
                 if conversation_id:
                     db = get_database()
-                    assistant_msg = MessageModel(
-                        conversation_id=conversation_id,
-                        role="assistant",
-                        content=response_text
-                    )
-                    await db.messages.insert_one(assistant_msg.dict(by_alias=True))
+                    if db is not None:
+                        assistant_msg = MessageModel(
+                            conversation_id=conversation_id,
+                            role="assistant",
+                            content=response_text
+                        )
+                        await db.messages.insert_one(assistant_msg.model_dump(by_alias=True))
 
-                    # Update conversation's updated_at
-                    await db.conversations.update_one(
-                        {"_id": conv_model.id},
-                        {"$set": {"updated_at": datetime.utcnow()}}
-                    )
+                        # Update conversation's updated_at
+                        await db.conversations.update_one(
+                            {"_id": conv_model.id},
+                            {"$set": {"updated_at": datetime.utcnow()}}
+                        )
 
                 acc.append({"role": "assistant", "content": response_text})
                 log_chat(acc[-2:])
@@ -203,7 +221,7 @@ async def websocket_endpoint(ws: WebSocket, token: Optional[str] = Query(None)):
                 is_processing = False
 
             resp = LLMResponse(text="申し訳ございません。エラーが発生しました。もう一度お試しください。")
-            await ws.send_json(resp.dict())
+            await ws.send_json(resp.model_dump())
 
 @app.websocket("/ws/chat")
 async def authenticated_websocket_endpoint(

@@ -1024,10 +1024,10 @@ def predict_crime_and_punishment(hist, add_optional_questions=True, use_rag=Fals
             result = rag_manager.predict_crime_and_sentencing_with_rag(incident_text)
 
             # 罪名と量刑を結合して返す
-            response_text = f"""【罪名予測（RAG）】
+            response_text = f"""【罪名予測】
 {result['crime_names']}
 
-【量刑予測（RAG）】
+【量刑予測】
 {result['sentencing']}
 """
             yield response_text
@@ -1108,7 +1108,7 @@ def predict_crime_and_punishment(hist, add_optional_questions=True, use_rag=Fals
             yield optional_questions
 
                 
-def reply(hist, genre=None, use_rag=False):
+def reply(hist, genre=None, use_rag=False, data_for_clarify_only=False):
     """
     chat_docsは刑法や刑訴法の条解など
     今後のアップデートが切り分けるようにしたい
@@ -1117,6 +1117,7 @@ def reply(hist, genre=None, use_rag=False):
         hist: 会話履歴
         genre: 相談ジャンル (criminal, traffic, violence, property, drugs, other)
         use_rag: RAGを使用するか
+        data_for_clarify_only: 深掘り質問生成時のみデータテーブルを使用するか（回答生成時はLLMのみ）
     """
     if not hist:
         return WELCOME_MESSAGE
@@ -1183,6 +1184,24 @@ def reply(hist, genre=None, use_rag=False):
         if clarifying_question:
             print("＞詳細確認: ", clarifying_question)
             return clarifying_question
+
+    # data_for_clarify_onlyモードの場合はLLMのみで回答生成
+    if data_for_clarify_only:
+        import src.chat_comparison as chat_comparison
+        llm_only_manager = chat_comparison.llm_only_manager
+
+        if rt == 'predict_crime_and_punishment':
+            print("＞罪名と量刑の統合予測（LLMのみ）")
+            return llm_only_manager.generate_crime_and_punishment_prediction(hist)
+        elif rt == 'predict_crime_type':
+            print("＞罪名予測（LLMのみ）")
+            return llm_only_manager.generate_crime_prediction(hist)
+        elif rt == 'predict_punishment':
+            print("＞量刑予測（LLMのみ）")
+            return llm_only_manager.generate_punishment_prediction(hist)
+        elif rt == 'legal_process':
+            print("＞法プロセス（LLMのみ）")
+            return llm_only_manager.generate_legal_process_answer(hist)
 
     # 詳細が十分な場合は通常の回答処理（任意質問付き）
     if rt == 'predict_crime_and_punishment':
